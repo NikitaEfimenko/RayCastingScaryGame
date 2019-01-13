@@ -1,10 +1,25 @@
-.App {
-  text-align: center;
+html,
+body,
+#root{
+  width: 100%;
+  height: 100%;
+  background: #888
+}
+.game{
+  border:3px solid #333;
 }
 
-.App-logo {
-  animation: App-logo-spin infinite 20s linear;
-  height: 40vmin;
+.center{
+  position: absolute;
+  top:50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+}
+.map{
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%,0);
 }
 
 .App-header {
