@@ -67,14 +67,8 @@ let initial = {
 		origin: {
 			x:430,
 			y:290
-		}
-	},
-
-	movement:{ 
-		left: 'a',
-		right: 'd',
-		up: 'w',
-		down: 's'
+		},
+		health: 100
 	},
 
 	map:[
@@ -94,20 +88,17 @@ let initial = {
 			height:500
 		}
 	],
-	enemies:[
-		{
-			x:300,
-			y:250
-		}
-	]
+	enemies:[]
 
 }
+
+initial.enemies = [...Array(50).keys()].map(i => ({x:900 * Math.random(), y: 900 * Math.random(), health: Math.random() * 100}))
 
 const d = (vec1, vec2) => Math.sqrt((vec1.x - vec2.x)**2 + (vec1.y - vec2.y)**2)
 const length = vec1 => Math.sqrt(vec1.x**2 + vec1.y**2)
 const dot = (vec1, vec2) => vec1.x * vec2.x + vec1.y * vec2.y
 const det = (vec1, vec2) => vec1.x * vec2.y  - vec1.y * vec2.x
-const angle = (vec1, vec2) => Math.sign(det(vec1,vec2)) * Math.acos(dot(vec1,vec2)/length(vec1)/length(vec2))
+const angle = (vec1, vec2) => Math.acos(dot(vec1,vec2)/length(vec1)/length(vec2))
 
 
 const View3D = (ctx, w, h) => {
@@ -120,7 +111,7 @@ const View3D = (ctx, w, h) => {
 	const origin = initial.hero.origin
 	//
 	const delta = initial.hero.direction.alpha / numColumns
-
+	let rayDistance = Array(numColumns).fill(0)
 	const Ray = (num, map) => {
 		const mapSize = Math.floor(Math.sqrt(map.length))
 		const count = depth / mapSize
@@ -160,6 +151,7 @@ const View3D = (ctx, w, h) => {
 				isGoal = intersection(x0, y0).type
 			}
 			const goal = intersection(x0, y0)
+			rayDistance[num] = distance
 			const {type, part} = inspectIntersection(current, goal) 
 			return {
 				z: Math.cos(alpha) * distance / depth,
@@ -189,31 +181,6 @@ const View3D = (ctx, w, h) => {
 			 Column(num, map)
 		})
 	}
-	const Heroes = () => {
-		const {x,y} = initial.hero.origin
-		const {enemies} = initial	
-		enemies.forEach(enemy => {
-			const dist = d(enemy, {x,y})
-			const ang = angle({x:enemy.x-x,y:enemy.y-y}, initial.hero.direction)
-			if (dist < depth && ang < initial.hero.direction.alpha ){
-				const z = dist / depth
-				const num = Math.floor((initial.hero.direction.alpha / 2 - ang) / initial.hero.direction.alpha  * numColumns)
-				ctx.globalAlpha = Math.max(1 - z, 0);
-				const sz = h / z / 10
-				const enemyLine = horisont + 30
-				ctx.drawImage(monster,num * columnWidth - sz , enemyLine - sz / 2, sz, sz)
-			}
-		})
-	}
-
-	const Background = () => {
-		ctx.globalAlpha = 1;
-		ctx.drawImage(bg,0,0,1000,700,0, 0, 1000,1000)
-		ctx.globalAlpha = 0.7;
-		ctx.fillStyle =`rgba(0,0,0,1)`
-		ctx.fillRect(0,0,1000,1000)
-	}
-
 	const Lamp = (() => {
 		const x = w / 2
 		const y = h / 1.2
@@ -243,11 +210,82 @@ const View3D = (ctx, w, h) => {
 			state += step
 		}
 	})()
+
+	const Enemies = (state) => {
+		const {x,y} = initial.hero.origin
+		const {enemies} = initial	
+		enemies.forEach(enemy => {
+			const dist = d(enemy, {x,y})
+			const ang = Math.sign(det({x:enemy.x-x,y:enemy.y-y}, initial.hero.direction)) * angle({x:enemy.x-x,y:enemy.y-y}, initial.hero.direction)
+			if (dist < depth && Math.abs(ang) < initial.hero.direction.alpha){
+				const z = dist / depth
+				const num = Math.floor((initial.hero.direction.alpha / 2 - ang) / initial.hero.direction.alpha  * numColumns)
+				ctx.globalAlpha = Math.max(1 - z, 0);
+				const sz = h / z / 10
+				const enemyLine = horisont + 30
+				if (dist < rayDistance[num]) ctx.drawImage(monster,num * columnWidth - sz , enemyLine - sz / 2, sz, sz)
+			}
+		})
+	}
+
+	const Health = (() => {
+		const HealthBar = health => {
+			ctx.globalAlpha = 1
+			ctx.fillStyle = '#F00'
+			ctx.fillRect(w  - 50, h - health  - 30, 15, health)
+		}
+		const heal = () => {
+			ctx.fillStyle = 'rgba(0,255,0,0.1)'
+			ctx.fillRect(0,0,1000,1000)
+		}
+		const hit = () => {
+			ctx.fillStyle = 'rgba(255,0,0,0.1)'
+			ctx.fillRect(0,0,1000,1000)
+		}
+		let pre = 100
+		return (health) => {
+			HealthBar(health)
+			const res = health - pre
+			if ( res < 0 ) {
+				hit()
+			}
+			else if (res > 0){
+				heal()
+			}
+			pre = health
+		}	
+	})()
+
+	const Death = (health) => {
+		if (health <= 0){
+			ctx.fillStyle = 'rgba(255,255,255,255.1)'
+			ctx.fillRect(0,0,1000,1000)
+		}
+	}
+
+	const Hero = (going) => {
+		Lamp(going)
+		Health(initial.hero.health)
+		Death(initial.hero.health)
+	}
+
+	const Heroes = (state, going) => {
+		Enemies(state)
+		Hero(going)
+	}
+
+	const Background = () => {
+		ctx.globalAlpha = 1;
+		ctx.drawImage(bg,0,0,1000,700,0, 0, 1000,1000)
+		ctx.globalAlpha = 0.7;
+		ctx.fillStyle =`rgba(0,0,0,1)`
+		ctx.fillRect(0,0,1000,1000)
+	}
+
 	return {
 		Map,
 		Heroes,
-		Background,
-		Lamp
+		Background
 	}
 }
 
@@ -255,6 +293,7 @@ const View3D = (ctx, w, h) => {
 
 
 const View2D = (ctx, w, h, count) => {
+	const depth = 200
 	const draw = (i,j) => {
 		ctx.beginPath()
 		ctx.fillStyle = `rgba(0,0,0,0.7)`
@@ -263,7 +302,6 @@ const View2D = (ctx, w, h, count) => {
 	}
 	const Enemies = () => {
 		const {x, y} = initial.hero.origin
-		const depth = 400
 		const {enemies} = initial	
 		enemies.forEach(enemy => {
 			if (d(enemy, {x,y}) < depth && angle({x:enemy.x-x,y:enemy.y-y}, initial.hero.direction) < initial.hero.direction.alpha ){
@@ -275,7 +313,7 @@ const View2D = (ctx, w, h, count) => {
 
 	const Heroes = (state) => {
 		const {x, y} = state.origin
-		const l = 200
+		const l = depth
 		const alpha =  state.direction.alpha
 		const tox = x + state.direction.x
 		const toy = y + state.direction.y
@@ -306,9 +344,6 @@ const View2D = (ctx, w, h, count) => {
 			if (el) draw(i, j)
 		})
 	}
-	const Lamp = () => {
-
-	}
 	const Background = () => {
 		ctx.fillStyle = '#4b525e'
 		ctx.fillRect(0,0,1000,1000)
@@ -316,8 +351,7 @@ const View2D = (ctx, w, h, count) => {
 	return {
 		Map,
 		Heroes,
-		Background,
-		Lamp
+		Background
 	}
 }
 
@@ -330,29 +364,46 @@ const Engine = (canvas, config) => {
 	let going = false
 	const Drawer2D = View2D(ctx, w, h, count)
 	const Drawer3D = View3D(ctx, canvas.width, canvas.height)
+	let preX = 0
+	let preY = 0
 
-	const _step = (up = true, down = true) => {
-		if (up) initial.hero.origin.x += initial.hero.direction.x / count * 5 
-		if (down) initial.hero.origin.y += initial.hero.direction.y / count * 5
-	}
 
-	const Rand = () => {
-		const step = () => Math.random() > 0.5 ? Math.random():-Math.random()
-		initial.enemies = initial.enemies.map(({x,y}) => ({x:x + step(), y:y + step()}))
-	}
+	const LiveCycle = (...elem) => [...elem].forEach(f => f()) 
 
 	const Update = () => {
 		const prex = initial.hero.origin.x
 		const prey = initial.hero.origin.y
-		const inspect = () => {
-			const {x, y} = initial.hero.origin
-			if(intersection(x,y).type){
-				initial.hero.origin.x = prex
-				initial.hero.origin.y = prey
-			}
+		const preEnemies = [...initial.enemies]
+		const _step = () => {
+			initial.hero.origin.x += initial.hero.direction.x / count * 5 
+			initial.hero.origin.y += initial.hero.direction.y / count * 5
 		}
+		const wandering = () => {
+			const step = () => Math.random() > 0.5 ? Math.random():-Math.random()
+			initial.enemies = initial.enemies.map(({x,y}) => ({x:x + step(), y:y + step()}))
+		}
+		const inspect = ({x,y}, pre) => intersection(x,y).type ? {x: pre.x, y: pre.y} : {x,y}
+		const step = () => {if (going) _step()}
+		
+		const damageCalculation = () => {
+			const { x, y } = initial.hero.origin
+			initial.enemies.forEach(enemy => {
+				if (d(enemy, {x, y}) < 10){
+					initial.hero.health -= 0.3
+				}
+			})
+		}
+
 		const solveCollision = () => {
-			inspect()
+			const cords = inspect(initial.hero.origin, {x:prex, y:prey})
+			initial.hero.origin.x = cords.x
+			initial.hero.origin.y = cords.y
+			
+			initial.enemies.forEach((cords,i) => {
+				const ins = inspect(cords, preEnemies[i])
+				initial.enemies[i].x = ins.x
+				initial.enemies[i].y = ins.y
+			})
 		}
 		const intersection = (x, y) => {
 			const i = Math.floor(count * x / canvas.width)
@@ -362,21 +413,20 @@ const Engine = (canvas, config) => {
 				type:map[i + count * j]
 			}
 		} 
-		if (going){
-			stepSound()
-			_step()
-			solveCollision()
-		}
-		Rand()
-	}
+		LiveCycle(
+			step,
+			wandering,
+			solveCollision,
+			damageCalculation
+		)
 
+	}
 	const Looper = (drawer) => {
 		let id = null
 		const start = () => {
 			drawer.Background()
 			drawer.Map(map)
-			drawer.Heroes(initial.hero)
-			drawer.Lamp(going)
+			drawer.Heroes(initial.hero, going)
 			Update()
 			id = requestAnimationFrame(start)
 		}
@@ -424,8 +474,8 @@ const Engine = (canvas, config) => {
 	}
 
 	const Sounds = () => {
-		 background()
-		 howl()
+		 //background()
+		 //howl()
 	}
 
 

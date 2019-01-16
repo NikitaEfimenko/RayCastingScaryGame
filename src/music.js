@@ -51,7 +51,7 @@ export const scream = (() => {
   ]
   const sound = new Howl({
     	src:sounds,
-    	volume: 0.8,
+    	volume: 1,
     	onend: () => {
     		isEnd = true
     	}
